@@ -7,6 +7,7 @@ compile:
 
 clean:
 	@$(REBAR) clean
+	rm -f *.profile
 
 test: compile
 	@$(REBAR) eunit xref

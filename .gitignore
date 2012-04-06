@@ -1,4 +1,6 @@
+doc
 ebin
 erl_crash.dump
+.eunit
 *.swp
 *.profile
