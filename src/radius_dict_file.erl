@@ -56,38 +56,25 @@ parse_line(["$INCLUDE", File]) ->
     {ok, load(File)};
 
 parse_line(["ATTRIBUTE", Name, Code, Type]) ->
-    case get(vendor) of
-        undefined ->
-            {ok, #attribute{name = Name, code = list_to_integer(Code), type = list_to_atom(Type)}};
-        {_VendorName, VendorID} ->
-            C = {VendorID, list_to_integer(Code)},
-            {ok, #attribute{name = Name, code = C, type = list_to_atom(Type)}}
-    end;
+    {ok, #attribute{name = Name, code = list_to_integer(Code), type = list_to_atom(Type)}};
 
 parse_line(["ATTRIBUTE", Name, Code, Type, Extra]) ->
-    case get(vendor) of
-        undefined -> % ATTRIBUTE name number type OPTIONS
+    case get({vendor, Extra}) of
+        undefined ->
             Opts = [parse_option(string:tokens(I, "=")) || I <- string:tokens(Extra, ",")],
             A = #attribute{name = Name, code = list_to_integer(Code), type = list_to_atom(Type)},
             {ok, A#attribute{opts = Opts}};
-        {Extra, VendorID} -> % ATTRIBUTE name number type VENDOR-NAME
-            C = {VendorID, list_to_integer(Code)},
+        Vendor ->
+            C = {Vendor, list_to_integer(Code)},
             A = #attribute{name = Name, code = C, type = list_to_atom(Type)},
-            {ok, A};
-        {_VendorName, VendorID} -> % ATTRIBUTE name number type VENDOR-OPTIONS
-            Opts = [parse_option(string:tokens(I, "=")) || I <- string:tokens(Extra, ",")],
-            C = {VendorID, list_to_integer(Code)},
-            A = #attribute{name = Name, code = C, type = list_to_atom(Type)},
-            {ok, A#attribute{opts = Opts}}
+            {ok, A}
     end;
 
 parse_line(["VALUE", A, Name, Value]) ->
     V = #value{aname = A, vname = Name, value = list_to_integer(Value)},
     {ok, V};
 parse_line(["VENDOR", Name, Code]) ->
-    put(vendor, {Name, list_to_integer(Code)});
-parse_line(["END-VENDOR", _]) ->
-    erase(vendor);
+    put({vendor, Name}, list_to_integer(Code));
 parse_line(_) ->
     ok.
 

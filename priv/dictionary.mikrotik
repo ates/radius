@@ -1,0 +1,39 @@
+# -*- text -*-
+#	http://www.mikrotik.com
+#
+#	http://www.mikrotik.com/documentation//manual_2.9/dictionary
+#
+#	Do NOT follow their instructions and replace the dictionary
+#	in /etc/raddb with the one that they supply.  It is NOT necessary.
+#
+#	On top of that, the sample dictionary file they provide
+#	DOES NOT WORK.  Do NOT use it.
+#
+#	$Id$
+#
+VENDOR		Mikrotik			14988
+
+ATTRIBUTE	Mikrotik-Recv-Limit			1	integer     Mikrotik
+ATTRIBUTE	Mikrotik-Xmit-Limit			2	integer     Mikrotik
+
+# this attribute is unused
+ATTRIBUTE	Mikrotik-Group				3	string      Mikrotik
+
+ATTRIBUTE	Mikrotik-Wireless-Forward		4	integer     Mikrotik
+ATTRIBUTE	Mikrotik-Wireless-Skip-Dot1x		5	integer     Mikrotik
+ATTRIBUTE	Mikrotik-Wireless-Enc-Algo		6	integer     Mikrotik
+ATTRIBUTE	Mikrotik-Wireless-Enc-Key		7	string      Mikrotik
+ATTRIBUTE	Mikrotik-Rate-Limit			8	string      Mikrotik
+ATTRIBUTE	Mikrotik-Realm				9	string      Mikrotik
+ATTRIBUTE	Mikrotik-Host-IP			10	ipaddr      Mikrotik
+ATTRIBUTE	Mikrotik-Mark-Id			11	string      Mikrotik
+ATTRIBUTE	Mikrotik-Advertise-URL			12	string      Mikrotik
+ATTRIBUTE	Mikrotik-Advertise-Interval		13	integer     Mikrotik
+ATTRIBUTE	Mikrotik-Recv-Limit-Gigawords		14	integer     Mikrotik
+ATTRIBUTE	Mikrotik-Xmit-Limit-Gigawords		15	integer     Mikrotik
+# MikroTik Values
+
+VALUE	Mikrotik-Wireless-Enc-Algo	No-encryption		0
+VALUE	Mikrotik-Wireless-Enc-Algo	40-bit-WEP		1
+VALUE	Mikrotik-Wireless-Enc-Algo	104-bit-WEP		2
+
