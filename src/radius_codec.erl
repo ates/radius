@@ -53,6 +53,11 @@ decode_packet(Bin, Secret) ->
             {error, Reason}
     end.
 
+%% @doc Returns the value of specified RADIUS attribute
+%% @spec attribute_value(non_neg_integer() | tuple(), radius_packet()) ->
+%%  not_found | term()
+-spec attribute_value(non_neg_integer() | tuple(), radius_packet()) ->
+    not_found | term().
 attribute_value(Code, Packet) when is_record(Packet, radius_packet) ->
     attribute_value(Code, Packet#radius_packet.attrs);
 attribute_value(Code, Attrs) when is_list(Attrs) ->
@@ -88,6 +93,69 @@ identify_packet(?COA_NAK) ->
     {ok, 'CoA-NAK'};
 identify_packet(Type) ->
     {unknown, Type}.
+
+%% @doc Encode RADIUS packet to binary
+%% @spec encode_response(radius_packet(), radius_packet(), string()) ->
+%%  {ok, binary()} | {error, term()}
+-spec encode_response(radius_packet(), radius_packet(), string()) ->
+    {ok, binary()} | {error, term()}.
+encode_response(Request, Response, Secret) ->
+    #radius_packet{code = C, attrs = A} = Response,
+    Code = <<C:8>>,
+    Ident = Request#radius_packet.ident,
+    ReqAuth = Request#radius_packet.auth,
+    case attribute_value("EAP-Message", A) of
+        undefined ->
+            case encode_attributes(A) of
+                {ok, Attrs} ->
+                    Length = <<(20 + byte_size(Attrs)):16>>,
+                    Auth = erlang:md5([Code, Ident, Length, ReqAuth, Attrs, Secret]),
+                    Data = list_to_binary([Code, Ident, Length, Auth, Attrs]),
+                    {ok, Data};
+                 {error, Reason} ->
+                     error_logger:error_msg(
+                         "** Unable to encode RADIUS attributes: ~p~n"
+                         "   for the reason: ~p~n", [A, Reason]),
+                    {error, Reason}
+            end;
+        _Value ->
+            try
+                A1 = A ++ [{"Message-Authenticator", <<0:128>>}],
+                {ok, A2} = encode_attributes(A1),
+
+                Length = <<(20 + byte_size(A2)):16>>,
+                Packet = list_to_binary([Code, Ident, Length, ReqAuth, A2]),
+                MA = crypto:md5_mac(Secret, Packet),
+
+                A3 = A ++ [{"Message-Authenticator", MA}],
+                {ok, A4} = encode_attributes(A3),
+
+                Auth = erlang:md5([Code, Ident, Length, ReqAuth, A4, Secret]),
+                Data = list_to_binary([Code, Ident, Length, Auth, A4]),
+                {ok, Data}
+            catch
+                _:Reason ->
+                    error_logger:error_msg(
+                        "** Unable to compute Message-Authenticator~n"
+                        "   for the reason: ~p~n"
+                        "** Attributes were: ~p~n", [Reason, A]),
+                    {error, Reason}
+            end
+    end.
+
+%% @doc Encode list of RADIUS attributes to binary
+%% @spec encode_attributes([radius_attribute()]) ->
+%%  {ok, binary()} | {error, term()}
+-spec encode_attributes([radius_attribute()]) ->
+    {ok, binary()} | {error, term()}.
+encode_attributes(Attrs) ->
+    try
+        Bin = encode_attributes(Attrs, []),
+        {ok, Bin}
+    catch
+        _:Reason ->
+            {error, Reason}
+    end.
 
 %%
 %% Internal functions
@@ -157,65 +225,6 @@ decode_value(Bin, Length) ->
     <<Value:Length/binary, Rest/binary>> = Bin,
     {Value, Rest}.
 
-lookup_value(Code, Name, Attrs) ->
-    case lists:keysearch(Code, 1, Attrs) of
-        {value, {_, Value}} ->
-            Value;
-        false ->
-            case lists:keysearch(Name, 1, Attrs) of
-                {value, {_, Value}} ->
-                    Value;
-                false ->
-                    undefined
-            end
-    end.
-
-encode_response(Request, Response, Secret) ->
-    #radius_packet{code = C, attrs = A} = Response,
-    Code = <<C:8>>,
-    Ident = Request#radius_packet.ident,
-    ReqAuth = Request#radius_packet.auth,
-    case attribute_value("EAP-Message", A) of
-        undefined ->
-            case encode_attributes(A) of
-                {ok, Attrs} ->
-                    Length = <<(20 + byte_size(Attrs)):16>>,
-                    Auth = erlang:md5([Code, Ident, Length, ReqAuth, Attrs, Secret]),
-                    Data = list_to_binary([Code, Ident, Length, Auth, Attrs]),
-                    {ok, Data};
-                _ ->
-                    {error, invalid}
-            end;
-        _Value ->
-            try
-                A1 = A ++ [{"Message-Authenticator", <<0:128>>}],
-                {ok, A2} = encode_attributes(A1),
-
-                Length = <<(20 + byte_size(A2)):16>>,
-                Packet = list_to_binary([Code, Ident, Length, ReqAuth, A2]),
-                MA = crypto:md5_mac(Secret, Packet),
-
-                A3 = A ++ [{"Message-Authenticator", MA}],
-                {ok, A4} = encode_attributes(A3),
-
-                Auth = erlang:md5([Code, Ident, Length, ReqAuth, A4, Secret]),
-                Data = list_to_binary([Code, Ident, Length, Auth, A4]),
-                {ok, Data}
-            catch
-                _:_ ->
-                    {error, invalid}
-            end
-    end.
-
-encode_attributes(Attrs) ->
-    try
-        Bin = encode_attributes(Attrs, []),
-        {ok, Bin}
-    catch
-        _:Reason ->
-            {error, Reason}
-    end.
-
 encode_attributes(undefined, []) ->
     <<>>;
 encode_attributes([], Bin) ->
@@ -243,7 +252,6 @@ encode_attribute(Code, Type, Value) ->
     Length = 2 + byte_size(Bin),
     <<Code:8, Length:8, Bin/binary>>.
 
-%% @doc Encodes RADIUS value to Erlang term.
 encode_value(Value, _Type) when is_binary(Value) ->
     Value;
 encode_value(Value, octets) when is_list(Value) ->
@@ -255,10 +263,11 @@ encode_value(Value, integer) when is_list(Value) ->
         IntValue = list_to_integer(Value),
         <<IntValue:32>>
     catch
-        _:_ ->
-            error_logger:warning_msg(
-                "Unable to encode attribute value ~p as integer~n", [Value]),
-            throw({error, encode_value})
+        _:Reason ->
+            error_logger:error_msg(
+                "** Unable to encode attribute value ~p as integer~n"
+                "   for the reason: ~p~n", [Value, Reason]),
+            throw({error, Reason})
     end;
 encode_value(Value, integer) when is_integer(Value) ->
     <<Value:32>>;
@@ -268,10 +277,11 @@ encode_value(Value, ipaddr) when is_list(Value) ->
     case inet_parse:address(Value) of
         {ok, {A, B, C, D}} ->
             <<A:8, B:8, C:8, D:8>>;
-        _ ->
-            error_logger:warning_msg(
-                "Unable to encode attribute value ~p as ipaddr~n", [Value]),
-            throw({error, encode_value})
+        {error, Reason} ->
+            error_logger:error_msg(
+                "** Unable to encode attribute value ~p as ipaddr~n"
+                "   for the reason: ~s~n", [Value, inet:format_error(Reason)]),
+            throw({error, Reason})
     end;
 encode_value({A, B, C, D}, ipaddr) ->
     <<A:8, B:8, C:8, D:8>>;
@@ -279,8 +289,11 @@ encode_value(Value, ipv6addr) when is_list(Value) ->
     case inet_parse:address(Value) of
         {ok, IP} when tuple_size(IP) == 8 ->
             encode_value(IP, ipv6addr);
-        _ ->
-            throw({error, encode_value})
+        {error, Reason} ->
+            error_logger:error_msg(
+                "** Unable to encode attribute value ~p as ipv6addr~n"
+                "   for the reason: ~s~n", [Value, inet:format_error(Reason)]),
+            throw({error, Reason})
     end;
 encode_value(Value, ipv6addr) when tuple_size(Value) == 8 ->
     binary:list_to_bin([<<I:16>> || I <- tuple_to_list(Value)]);
@@ -290,3 +303,18 @@ encode_value(Value, Type) ->
     error_logger:warning_msg(
         "Unable to encode attribute value ~p as ~p~n", [Value, Type]),
     throw({error, encode_value}).
+
+-spec lookup_value(non_neg_integer() | tuple(), string(), [radius_attribute()])
+    -> undefined | term().
+lookup_value(Code, Name, Attrs) ->
+    case lists:keysearch(Code, 1, Attrs) of
+        {value, {_, Value}} ->
+            Value;
+        false ->
+            case lists:keysearch(Name, 1, Attrs) of
+                {value, {_, Value}} ->
+                    Value;
+                false ->
+                    undefined
+            end
+    end.
