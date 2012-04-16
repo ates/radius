@@ -161,39 +161,45 @@ encode_attributes(Attrs) ->
 %% Internal functions
 %%
 decode_attributes(<<>>, Attrs) ->
-    lists:reverse(Attrs);
+    lists:reverse(lists:flatten(Attrs));
 decode_attributes(Bin, Attrs) ->
-    {ok, Type, Value, Rest} = decode_attribute(Bin),
-    decode_attributes(Rest, [{Type, Value} | Attrs]).
+    {Attr, Rest} = decode_attribute(Bin),
+    decode_attributes(Rest, [Attr | Attrs]).
 
-decode_attribute(<<?ATTRIBUTE>>) ->
+decode_attribute(<<Type:8, Length:8, Rest/binary>>) ->
     case Type of
         ?VENDOR_SPECIFIC ->
-            decode_vendor_attribute(Rest);
+            L = Length - 2,
+            <<Attr:L/binary-unit:8, Rest1/binary>> = Rest,
+            {decode_vendor_attributes(Attr), Rest1};
         _ ->
             case radius_dict:lookup_attribute(Type) of
                 not_found ->
                     error_logger:warning_msg(
                         "No attribute ~p found in dictionary~n", [Type]),
                     {Value, Rest1} = decode_value(Rest, Length - 2),
-                    {ok, Type, Value, Rest1};
+                    {{Type, Value}, Rest1};
                 A ->
                     {Value, Rest1} = decode_value(Rest, Length - 2, A#attribute.type),
-                    {ok, A#attribute.name, Value, Rest1}
+                    {{A#attribute.name, Value}, Rest1}
             end
     end.
 
-decode_vendor_attribute(<<?VENDOR_ATTRIBUTE>>) ->
-    case radius_dict:lookup_attribute({Id, Type}) of
+decode_vendor_attributes(<<VendorId:4/integer-unit:8, Rest/binary>>) ->
+    decode_vendor_attribute(VendorId, Rest, []).
+
+decode_vendor_attribute(_, <<>>, Acc) -> Acc;
+decode_vendor_attribute(VendorId, <<Id, Length:8, Value/binary>>, Acc) ->
+    case radius_dict:lookup_attribute({VendorId, Id}) of
         not_found ->
             error_logger:warning_msg(
                 "No vendor specific attribute ~p found in dictionary~n",
-                [{Id, Type}]),
-            {Value, Rest1} = decode_value(Rest, Length - 2),
-            {ok, {Id, Type}, Value, Rest1};
+                [{VendorId, Id}]),
+            {V, Rest1} = decode_value(Value, Length - 2),
+            decode_vendor_attribute(VendorId, Rest1, [{{VendorId, Id}, V} | Acc]);
         A ->
-            {Value, Rest1} = decode_value(Rest, Length - 2, A#attribute.type),
-            {ok, A#attribute.name, Value, Rest1}
+            {V, Rest1} = decode_value(Value, Length - 2, A#attribute.type),
+            decode_vendor_attribute(VendorId, Rest1, [{A#attribute.name, V} | Acc])
     end.
 
 %% 0-253 octets
@@ -215,9 +221,10 @@ decode_value(Bin, Length, ipaddr) ->
 decode_value(Bin, Length, ipv6addr) ->
     <<Value:Length/binary, Rest/binary>> = Bin,
     {list_to_tuple([I || <<I:16>> <= Value]), Rest};
-decode_value(Bin, _Length, ipv6prefix) ->
-    <<0:8, Prefix:8, IP/binary>> = Bin,
-    {{Prefix, list_to_tuple([I || <<I:16>> <= IP])}, <<>>};
+decode_value(Bin, Length, ipv6prefix) ->
+    IPLength = Length - 2,
+    <<0:8, Prefix:8, IP:IPLength/binary, Rest/binary>> = Bin,
+    {{Prefix, list_to_tuple([I || <<I:16>> <= IP])}, Rest};
 decode_value(Bin, Length, _Type) ->
     decode_value(Bin, Length).
 

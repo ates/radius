@@ -29,6 +29,7 @@ $INCLUDE dictionary.rfc3576
 $INCLUDE dictionary.microsoft
 $INCLUDE dictionary.mikrotik
 $INCLUDE dictionary.cisco
+$INCLUDE dictionary.3gpp
 #
 #	Following are the proper new names. Use these.
 #
