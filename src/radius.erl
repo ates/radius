@@ -1,7 +1,9 @@
 -module(radius).
 
 %% API
--export([start_service/2, stop_service/1, services/0, add_client/2]).
+-export([start_service/2, stop_service/1, services/0]).
+
+-export([add_client/2, del_client/2]).
 
 -export([attribute_value/2]).
 
@@ -36,6 +38,12 @@ services() ->
 -spec add_client(atom(), nas_spec()) -> ok.
 add_client(Name, NasSpec) when is_atom(Name), is_record(NasSpec, nas_spec) ->
     gen_server:call(Name, {add_client, NasSpec}).
+
+%% @doc Delete NAS for specific service
+%% @spec del_client(atom(), any()) -> ok
+-spec del_client(atom(), any()) -> ok.
+del_client(SvcName, NasName) when is_atom(SvcName) ->
+    gen_server:call(SvcName, {del_client, NasName}).
 
 %% @doc Returns value of RADIUS attribute defined in packet
 %% @spec attribute_valude(non_neg_integer() | tuple() | string(),

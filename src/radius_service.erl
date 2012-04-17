@@ -44,6 +44,15 @@ handle_call({add_client, NasSpec}, _From, State) ->
     ets:insert(State#state.clients, NasSpec),
     {reply, ok, State};
 
+handle_call({del_client, NasName}, _From, State) ->
+    Pattern = {nas_spec, NasName, '_', '_'},
+    case ets:match_object(State#state.clients, Pattern) of
+        [NasSpec] ->
+            ets:delete_object(State#state.clients, NasSpec);
+        _ -> ok
+    end,
+    {reply, ok, State};
+
 handle_call(_Request, _From, State) -> {reply, ok, State}.
 
 handle_cast(_Msg, State) -> {noreply, State}.
