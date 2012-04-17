@@ -24,6 +24,7 @@
 #
 $INCLUDE dictionary.rfc2868
 $INCLUDE dictionary.rfc2869
+$INCLUDE dictionary.rfc2866
 $INCLUDE dictionary.rfc3162
 $INCLUDE dictionary.rfc3576
 $INCLUDE dictionary.microsoft
