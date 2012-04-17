@@ -225,6 +225,9 @@ decode_value(Bin, Length, ipv6prefix) ->
     IPLength = Length - 2,
     <<0:8, Prefix:8, IP:IPLength/binary, Rest/binary>> = Bin,
     {{Prefix, list_to_tuple([I || <<I:16>> <= IP])}, Rest};
+decode_value(Bin, Length, byte) ->
+    <<Value:Length/unsigned-integer-unit:8, Rest/binary>> = Bin,
+    {Value, Rest};
 decode_value(Bin, Length, _Type) ->
     decode_value(Bin, Length).
 
@@ -306,6 +309,8 @@ encode_value(Value, ipv6addr) when tuple_size(Value) == 8 ->
     binary:list_to_bin([<<I:16>> || I <- tuple_to_list(Value)]);
 encode_value({Prefix, IP}, ipv6prefix) ->
     list_to_binary([<<0:8, Prefix:8>>, encode_value(IP, ipv6addr)]);
+encode_value(Value, byte) ->
+    <<Value:8/unsigned-integer>>;
 encode_value(Value, Type) ->
     error_logger:warning_msg(
         "Unable to encode attribute value ~p as ~p~n", [Value, Type]),
