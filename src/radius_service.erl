@@ -4,7 +4,7 @@
 
 %% API
 -export([start_link/4]).
--export([do_callback/1]).
+
 %% gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2,
          handle_info/2, code_change/3, terminate/2]).
@@ -60,7 +60,7 @@ handle_cast(_Msg, State) -> {noreply, State}.
 
 handle_info({udp, Socket, SrcIP, SrcPort, Bin}, State) ->
     Opts = [SrcIP, SrcPort, Socket, Bin, State],
-    proc_lib:spawn_link(?MODULE, do_callback,[Opts]),
+    proc_lib:spawn_link(fun() -> do_callback(Opts) end),
     {noreply, State};
 
 handle_info({'EXIT', _Pid, normal}, State) -> {noreply, State};
