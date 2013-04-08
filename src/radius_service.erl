@@ -9,15 +9,12 @@
 -export([init/1, handle_call/3, handle_cast/2,
          handle_info/2, code_change/3, terminate/2]).
 
--export([behaviour_info/1]).
-
-
 -include("radius.hrl").
 
-behaviour_info(callbacks) ->
-    [{handle_request, 3}];
-behaviour_info(_) ->
-    undefined.
+-callback handle_request(Type :: non_neg_integer(),
+                         Request :: #radius_packet{},
+                         Client :: #nas_spec{}) ->
+    {ok, Response :: #radius_packet{}} | noreply.
 
 -record(state, {socket, clients, callback}).
 

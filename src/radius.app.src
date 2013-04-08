@@ -2,5 +2,5 @@
     {description, "RADIUS"},
     {vsn, "0.0.2"},
     {applications, [kernel, stdlib]},
-    {mod, {radius_app, []}},
+    {mod, {radius_app, []}}
 ]}.
