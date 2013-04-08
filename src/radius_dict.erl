@@ -9,7 +9,6 @@
 -define(VALUES_TABLE, radius_dict_values).
 
 %% @doc Adds RADIUS attribute of value to internal storage
-%% @spec add(radius_attribute() | radius_value()) -> true
 -spec add(radius_attribute() | radius_value()) -> true.
 add(Attribute) when is_record(Attribute, attribute) ->
     ets:insert(?ATTRS_TABLE, Attribute);
@@ -18,8 +17,6 @@ add(Value) when is_record(Value, value) ->
     ets:insert(?VALUES_TABLE, {Key, Value}).
 
 %% @doc Looking for the specified RADIUS attribute
-%% @spec lookup_attribute(string() | non_neg_integer() | tuple()) ->
-%%  not_found | radius_attribute()
 -spec lookup_attribute(string() | non_neg_integer() | tuple()) ->
     not_found | radius_attribute().
 lookup_attribute(Name) when is_list(Name) ->
@@ -39,7 +36,6 @@ lookup_attribute(Code) ->
     end.
 
 %% @doc Looking for the specified RADIUS value
-%% @spec lookup_value(string(), string()) -> not_found | term().
 -spec lookup_value(string(), string()) -> not_found | term().
 lookup_value(A, V) ->
     case ets:lookup(?VALUES_TABLE, {A, V}) of
@@ -50,7 +46,6 @@ lookup_value(A, V) ->
     end.
 
 %% @doc Returns the list of registered attributes or values.
-%% @spec to_list(attrs | values) -> [] | [radius_attribute() | radius_value()]
 -spec to_list(attrs | values) -> [] | [radius_attribute() | radius_value()].
 to_list(attrs) ->
     ets:tab2list(?ATTRS_TABLE);

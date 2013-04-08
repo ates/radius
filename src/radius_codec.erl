@@ -6,8 +6,6 @@
 -include("radius.hrl").
 
 %% @doc Decode binary RADIUS packet.
-%% @spec decode_packet(binary(), string()) ->
-%%  {ok, radius_packet()} | {error, term()}.
 -spec decode_packet(binary(), string()) ->
     {ok, radius_packet()} | {error, term()}.
 decode_packet(Bin, Secret) ->
@@ -54,8 +52,6 @@ decode_packet(Bin, Secret) ->
     end.
 
 %% @doc Returns the value of specified RADIUS attribute
-%% @spec attribute_value(non_neg_integer() | tuple(), radius_packet()) ->
-%%  not_found | term()
 -spec attribute_value(non_neg_integer() | tuple(), radius_packet()) ->
     not_found | term().
 attribute_value(Code, Packet) when is_record(Packet, radius_packet) ->
@@ -69,8 +65,6 @@ attribute_value(Code, Attrs) when is_list(Attrs) ->
     end.
 
 %% @doc Returns type of the request
-%% @spec identify_packet(non_neg_integer()) ->
-%%  {ok, atom()} | {unknown, non_neg_integer()}.
 -spec identify_packet(non_neg_integer()) ->
     {ok, atom()} | {unknown, non_neg_integer()}.
 identify_packet(?ACCESS_REQUEST) ->
@@ -95,8 +89,6 @@ identify_packet(Type) ->
     {unknown, Type}.
 
 %% @doc Encode RADIUS packet to binary
-%% @spec encode_response(radius_packet(), radius_packet(), string()) ->
-%%  {ok, binary()} | {error, term()}
 -spec encode_response(radius_packet(), radius_packet(), string()) ->
     {ok, binary()} | {error, term()}.
 encode_response(Request, Response, Secret) ->
@@ -144,8 +136,6 @@ encode_response(Request, Response, Secret) ->
     end.
 
 %% @doc Encode list of RADIUS attributes to binary
-%% @spec encode_attributes([radius_attribute()]) ->
-%%  {ok, binary()} | {error, term()}
 -spec encode_attributes([radius_attribute()]) ->
     {ok, binary()} | {error, term()}.
 encode_attributes(Attrs) ->
