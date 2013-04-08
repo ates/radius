@@ -8,17 +8,17 @@
 -define(ATTRS_TABLE, radius_dict_attrs).
 -define(VALUES_TABLE, radius_dict_values).
 
-%% @doc Adds RADIUS attribute of value to internal storage
--spec add(radius_attribute() | radius_value()) -> true.
+%% @doc Adds RADIUS attribute/value to internal storage
+-spec add(#attribute{} | #value{}) -> ok.
 add(Attribute) when is_record(Attribute, attribute) ->
-    ets:insert(?ATTRS_TABLE, Attribute);
+    ets:insert(?ATTRS_TABLE, Attribute), ok;
 add(Value) when is_record(Value, value) ->
     Key = {Value#value.aname, Value#value.value},
-    ets:insert(?VALUES_TABLE, {Key, Value}).
+    ets:insert(?VALUES_TABLE, {Key, Value}), ok.
 
 %% @doc Looking for the specified RADIUS attribute
 -spec lookup_attribute(string() | non_neg_integer() | tuple()) ->
-    not_found | radius_attribute().
+    not_found | #attribute{}.
 lookup_attribute(Name) when is_list(Name) ->
     Pattern = {attribute, '_', '_', Name, '_'},
     case ets:match_object(?ATTRS_TABLE, Pattern, 1) of
@@ -46,7 +46,6 @@ lookup_value(A, V) ->
     end.
 
 %% @doc Returns the list of registered attributes or values.
--spec to_list(attrs | values) -> [] | [radius_attribute() | radius_value()].
 to_list(attrs) ->
     ets:tab2list(?ATTRS_TABLE);
 to_list(values) ->

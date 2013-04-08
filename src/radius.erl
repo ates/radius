@@ -30,7 +30,7 @@ services() ->
     [S || {S, _, _, _} <- supervisor:which_children(radius_sup)].
 
 %% @doc Add new NAS to the list of allowed NASes for specific service
--spec add_client(atom(), nas_spec()) -> ok.
+-spec add_client(atom(), #nas_spec{}) -> ok.
 add_client(Name, NasSpec) when is_atom(Name), is_record(NasSpec, nas_spec) ->
     gen_server:call(Name, {add_client, NasSpec}).
 
@@ -41,6 +41,6 @@ del_client(SvcName, NasName) when is_atom(SvcName) ->
 
 %% @doc Returns value of RADIUS attribute defined in packet
 -spec attribute_value(non_neg_integer() | tuple() | string(),
-    radius_packet() | list()) -> undefined | term().
+    #radius_packet{} | list()) -> undefined | term().
 attribute_value(Code, Packet) ->
     radius_codec:attribute_value(Code, Packet).

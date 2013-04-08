@@ -6,8 +6,8 @@
 -include("radius.hrl").
 
 %% @doc Decode binary RADIUS packet.
--spec decode_packet(binary(), string()) ->
-    {ok, radius_packet()} | {error, term()}.
+-spec decode_packet(Bin :: binary(), Secret :: string()) ->
+    {ok, Packet :: #radius_packet{}} | {error, Reason :: term()}.
 decode_packet(Bin, Secret) ->
     try
         <<?RADIUS_PACKET>> = Bin,
@@ -52,8 +52,8 @@ decode_packet(Bin, Secret) ->
     end.
 
 %% @doc Returns the value of specified RADIUS attribute
--spec attribute_value(non_neg_integer() | tuple(), radius_packet()) ->
-    not_found | term().
+-spec attribute_value(Code :: non_neg_integer() | tuple(), Packet :: #radius_packet{}) ->
+    undefined | proplists:property().
 attribute_value(Code, Packet) when is_record(Packet, radius_packet) ->
     attribute_value(Code, Packet#radius_packet.attrs);
 attribute_value(Code, Attrs) when is_list(Attrs) ->
@@ -65,7 +65,7 @@ attribute_value(Code, Attrs) when is_list(Attrs) ->
     end.
 
 %% @doc Returns type of the request
--spec identify_packet(non_neg_integer()) ->
+-spec identify_packet(Type :: non_neg_integer()) ->
     {ok, atom()} | {unknown, non_neg_integer()}.
 identify_packet(?ACCESS_REQUEST) ->
     {ok, 'Access-Request'};
@@ -89,8 +89,10 @@ identify_packet(Type) ->
     {unknown, Type}.
 
 %% @doc Encode RADIUS packet to binary
--spec encode_response(radius_packet(), radius_packet(), string()) ->
-    {ok, binary()} | {error, term()}.
+-spec encode_response(Request :: #radius_packet{},
+                      Response :: #radius_packet{},
+                      Secret :: string()) ->
+    {ok, binary()} | {error, Reason :: term()}.
 encode_response(Request, Response, Secret) ->
     #radius_packet{code = C, attrs = A} = Response,
     Code = <<C:8>>,
@@ -136,8 +138,8 @@ encode_response(Request, Response, Secret) ->
     end.
 
 %% @doc Encode list of RADIUS attributes to binary
--spec encode_attributes([radius_attribute()]) ->
-    {ok, binary()} | {error, term()}.
+-spec encode_attributes(Attrs :: [proplists:property()]) ->
+    {ok, binary()} | {error, Reason :: term()}.
 encode_attributes(Attrs) ->
     try
         Bin = encode_attributes(Attrs, []),
@@ -306,8 +308,6 @@ encode_value(Value, Type) ->
         "Unable to encode attribute value ~p as ~p~n", [Value, Type]),
     throw({error, encode_value}).
 
--spec lookup_value(non_neg_integer() | tuple(), string(), [radius_attribute()])
-    -> undefined | term().
 lookup_value(Code, Name, Attrs) ->
     case lists:keysearch(Code, 1, Attrs) of
         {value, {_, Value}} ->

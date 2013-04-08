@@ -16,16 +16,18 @@
                          Client :: #nas_spec{}) ->
     {ok, Response :: #radius_packet{}} | noreply.
 
--record(state, {socket, clients, callback}).
+-record(state, {
+    socket :: inet:socket(),
+    clients :: [#nas_spec{}],
+    callback :: module()
+}).
 
--spec start_link(atom(), inet:ip_address(), non_neg_integer(), atom()) ->
-    {ok, term()} | {error, term()}.
 start_link(Name, IP, Port, Callback) ->
     gen_server:start_link({local, Name}, ?MODULE, [IP, Port, Callback], []).
 
 init([IP, Port, Callback] = Options) ->
     process_flag(trap_exit, true),
-    case gen_udp:open(Port, [binary, proto(IP), {ip, IP}]) of
+    case gen_udp:open(Port, [binary, {ip, IP}]) of
         {ok, Socket} ->
             Clients = ets:new(clients, [{keypos, 3}]),
             {ok, #state{socket = Socket, clients = Clients, callback = Callback}};
@@ -73,44 +75,39 @@ terminate(_Reason, State) ->
 %%
 %% Internal functions
 %%
--spec proto(inet:ip_address()) -> inet:address_family().
-proto(Address) when tuple_size(Address) == 4 -> inet;
-proto(Address) when tuple_size(Address) == 8 -> inet6.
-
 do_callback([SrcIP, SrcPort, Socket, Bin, State]) ->
-    %error_logger:info_msg("Process do_callback started with Pid: ~p~n", [self()]),
     case lookup_client(SrcIP, State#state.clients) of
         {ok, #nas_spec{secret = Secret} = Client} ->
-	    case radius_codec:decode_packet(Bin, Secret) of
+            case radius_codec:decode_packet(Bin, Secret) of
                 {ok, Packet} ->
-		    case request_exists(SrcIP, SrcPort, Packet) of
+                    case request_exists(SrcIP, SrcPort, Packet) of
                         false ->
-			    store_request(SrcIP, SrcPort, Packet, self()),
-			    case radius_codec:identify_packet(Packet#radius_packet.code) of
-				{ok, Type} ->
-				    Callback=State#state.callback,
-				    case Callback:handle_request(Type, Packet, Client) of
-					{ok, Response} ->
-					    do_reply(Socket, SrcIP, SrcPort, Response, Packet, Client),
-					    sweep_request(SrcIP, SrcPort, Packet);
-					noreply ->
-					    sweep_request(SrcIP, SrcPort, Packet);
-					Unknown ->
-					    error_logger:error_msg("Bad return from handler: ~p~n", [Unknown])
-				    end;
-				{unknown, Unknown} ->
-				    error_logger:warning_msg("Unknown request type: ~p~n", [Unknown]),
-				    sweep_request(SrcIP, SrcPort, Packet)
-			    end;
-			true -> ok
+                            store_request(SrcIP, SrcPort, Packet, self()),
+                            case radius_codec:identify_packet(Packet#radius_packet.code) of
+                                {ok, Type} ->
+                                    Callback = State#state.callback,
+                                    case Callback:handle_request(Type, Packet, Client) of
+                                        {ok, Response} ->
+                                            do_reply(Socket, SrcIP, SrcPort, Response, Packet, Client),
+                                            sweep_request(SrcIP, SrcPort, Packet);
+                                        noreply ->
+                                            sweep_request(SrcIP, SrcPort, Packet);
+                                        Unknown ->
+                                            error_logger:error_msg("Bad return from handler: ~p~n", [Unknown])
+                                    end;
+                                {unknown, Unknown} ->
+                                    error_logger:warning_msg("Unknown request type: ~p~n", [Unknown]),
+                                    sweep_request(SrcIP, SrcPort, Packet)
+                            end;
+                        true -> ok
                     end;
-		_ ->
+                _ ->
                     error_logger:error_msg(
-		      "Received invalid packet from NAS: ~s~n", [inet_parse:ntoa(SrcIP)])
+                        "Received invalid packet from NAS: ~s~n", [inet_parse:ntoa(SrcIP)])
             end;
-	undefined ->
-	    error_logger:warning_msg(
-	      "Request from unknown client: ~s~n", [inet_parse:ntoa(SrcIP)])
+        undefined ->
+            error_logger:warning_msg(
+                "Request from unknown client: ~s~n", [inet_parse:ntoa(SrcIP)])
     end.
 
 do_reply(Socket, IP, Port, Response, Request, Client) ->

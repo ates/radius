@@ -31,10 +31,6 @@
 %%                    and is used in the password hiding algorithm
 %%     attributes: List of attributes that are required for the type of service,
 %%                 as well as any desired optional attributes
-
--type radius_packet() ::
-    {non_neg_integer(), binary(), binary(), [radius_attribute()]}.
-
 -record(radius_packet, {code, ident, auth, attrs = []}).
 
 %% RADIUS packet codes
@@ -69,10 +65,6 @@
 %%     code: Numeric code of the attribute
 %%     type: Attribute type (octets/ipaddr/string/integer/date)
 %%     name: Attribute name
-
--type radius_attribute() ::
-    {non_neg_integer() | tuple(), atom(), string(), term()}.
-
 -record(attribute, {code, type, name, opts}).
 
 %% Value record
@@ -80,9 +72,6 @@
 %%     aname: Attribute name
 %%     vname: Attribute value name
 %%     value: Attribute value
-
--type radius_value() :: {string(), string(), term()}.
-
 -record(value, {aname, vname, value}).
 
 %% Vendor-Specific attribute format
@@ -101,7 +90,4 @@
 %%     ip: IP address of the NAS
 %%     name: Identifies of NAS
 %%     secret: Shared secret required for NAS authorization
-
--type nas_spec() :: {atom(), inet:ip_address(), string()}.
-
 -record(nas_spec, {name, ip, secret}).
