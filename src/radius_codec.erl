@@ -2,6 +2,7 @@
 
 -export([decode_packet/2, attribute_value/2, identify_packet/1]).
 -export([encode_response/3, encode_attributes/1]).
+-export([encode_request/2]).
 
 -include("radius.hrl").
 
@@ -63,6 +64,15 @@ attribute_value(Code, Attrs) when is_list(Attrs) ->
         #attribute{code = Code1, name = Name} ->
             lookup_value(Code1, Name, Attrs)
     end.
+
+-spec encode_request(#radius_packet{}, string()) -> binary().
+encode_request(Request, Secret) ->
+    Code = Request#radius_packet.code,
+    Ident = Request#radius_packet.ident,
+    {ok, Attrs} = encode_attributes(Request#radius_packet.attrs),
+    Length = <<(20 + byte_size(Attrs)):16>>,
+    Auth = erlang:md5([Code, Ident, Length, <<0:128>>, Attrs, Secret]),
+    list_to_binary([Code, Ident, Length, Auth, Attrs]).
 
 %% @doc Returns type of the request
 -spec identify_packet(Type :: non_neg_integer()) ->
