@@ -28,7 +28,7 @@ decode_packet(Bin, Secret) ->
                         A1 = lists:keyreplace("Message-Authenticator", 1, A, {"Message-Authenticator", <<0:128>>}),
                         {ok, A2} = encode_attributes(A1),
                         Packet1 = [Code, Ident, <<Length:16>>, Auth, A2],
-                        case crypto:md5_mac(Secret, Packet1) =:= Value of
+                        case crypto:hmac(md5, Secret, Packet1) =:= Value of
                             true ->
                                 {ok, Packet};
                             false ->
@@ -129,7 +129,7 @@ encode_response(Request, Response, Secret) ->
 
                 Length = <<(20 + byte_size(A2)):16>>,
                 Packet = list_to_binary([Code, Ident, Length, ReqAuth, A2]),
-                MA = crypto:md5_mac(Secret, Packet),
+                MA = crypto:hmac(md5, Secret, Packet),
 
                 A3 = A ++ [{"Message-Authenticator", MA}],
                 {ok, A4} = encode_attributes(A3),
