@@ -319,11 +319,11 @@ encode_value(Value, Type) ->
     throw({error, encode_value}).
 
 lookup_value(Code, Name, Attrs) ->
-    case lists:keysearch(Code, 1, Attrs) of
+    case lists:keyfind(Code, 1, Attrs) of
         {value, {_, Value}} ->
             Value;
         false ->
-            case lists:keysearch(Name, 1, Attrs) of
+            case lists:keyfind(Name, 1, Attrs) of
                 {value, {_, Value}} ->
                     Value;
                 false ->
