@@ -320,13 +320,10 @@ encode_value(Value, Type) ->
 
 lookup_value(Code, Name, Attrs) ->
     case lists:keyfind(Code, 1, Attrs) of
-        {value, {_, Value}} ->
-            Value;
+        {Code, Value} -> Value;
         false ->
             case lists:keyfind(Name, 1, Attrs) of
-                {value, {_, Value}} ->
-                    Value;
-                false ->
-                    undefined
+                {Name, Value} -> Value;
+                false -> undefined
             end
     end.
