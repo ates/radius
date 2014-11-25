@@ -74,29 +74,28 @@ encode_request(Request, Secret) ->
     Auth = erlang:md5([Code, Ident, Length, <<0:128>>, Attrs, Secret]),
     list_to_binary([Code, Ident, Length, Auth, Attrs]).
 
-%% @doc Returns type of the request
--spec identify_packet(Type :: non_neg_integer()) ->
-    {ok, atom()} | {unknown, non_neg_integer()}.
+%% @doc Returns type of the request.
+-spec identify_packet(Type :: non_neg_integer()) -> atom() | integer().
 identify_packet(?ACCESS_REQUEST) ->
-    {ok, 'Access-Request'};
+    'Access-Request';
 identify_packet(?ACCOUNTING_REQUEST) ->
-    {ok, 'Accounting-Request'};
+    'Accounting-Request';
 identify_packet(?ACCESS_CHALLENGE) ->
-    {ok, 'Access-Challenge'};
+    'Access-Challenge';
 identify_packet(?DISCONNECT_REQUEST) ->
-    {ok, 'Disconnect-Request'};
+    'Disconnect-Request';
 identify_packet(?DISCONNECT_ACK) ->
-    {ok, 'Disconnect-ACK'};
+    'Disconnect-ACK';
 identify_packet(?DISCONNECT_NAK) ->
-    {ok, 'Disconnect-NAK'};
+    'Disconnect-NAK';
 identify_packet(?COA_REQUEST) ->
-    {ok, 'CoA-Request'};
+    'CoA-Request';
 identify_packet(?COA_ACK) ->
-    {ok, 'CoA-ACK'};
+    'CoA-ACK';
 identify_packet(?COA_NAK) ->
-    {ok, 'CoA-NAK'};
+    'CoA-NAK';
 identify_packet(Type) ->
-    {unknown, Type}.
+    Type.
 
 %% @doc Encode RADIUS packet to binary
 -spec encode_response(Request :: #radius_packet{},

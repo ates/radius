@@ -16,6 +16,8 @@
                          Client :: #nas_spec{}) ->
     {ok, Response :: #radius_packet{}} | noreply.
 
+-callback handle_error(Reason :: term(), Data :: term()) -> any().
+
 -record(state, {
     socket :: inet:socket(),
     requests :: ets:tid(), %% table used to store requests from clients
@@ -75,48 +77,31 @@ terminate(_Reason, State) ->
     gen_udp:close(State#state.socket).
 
 %% Internal functions
-do_callback([SrcIP, SrcPort, Socket, Bin, State]) ->
+do_callback([SrcIP, SrcPort, Socket, Bin, #state{requests = Requests, callback = Callback} = State]) ->
     case lookup_client(SrcIP, State#state.clients) of
         {ok, #nas_spec{secret = Secret} = Client} ->
             case radius_codec:decode_packet(Bin, Secret) of
                 {ok, #radius_packet{ident = Ident} = Packet} ->
-                    case ets:member(State#state.requests, {SrcIP, SrcPort, Ident}) of
+                    case ets:member(Requests, {SrcIP, SrcPort, Ident}) of
                         false ->
-                            true = ets:insert(State#state.requests, {{SrcIP, SrcPort, Ident}, self()}),
-                            case radius_codec:identify_packet(Packet#radius_packet.code) of
-                                {ok, Type} ->
-                                    Callback = State#state.callback,
-                                    case Callback:handle_request(Type, Packet, Client) of
-                                        {ok, Response} ->
-                                            do_reply(Socket, SrcIP, SrcPort, Response, Packet, Client),
-                                            sweep_request(SrcIP, SrcPort, Ident, State#state.requests);
-                                        noreply ->
-                                            sweep_request(SrcIP, SrcPort, Ident, State#state.requests);
-                                        Unknown ->
-                                            error_logger:error_msg("Bad return from handler: ~p~n", [Unknown])
-                                    end;
-                                {unknown, Unknown} ->
-                                    error_logger:warning_msg("Unknown request type: ~p~n", [Unknown]),
-                                    sweep_request(SrcIP, SrcPort, Ident, State#state.requests)
+                            %% store request in the table to avoid duplicates
+                            true = ets:insert(Requests, {{SrcIP, SrcPort, Ident}, self()}),
+                            PacketType = radius_codec:identify_packet(Packet#radius_packet.code),
+                            case Callback:handle_request(PacketType, Packet, Client) of
+                                {ok, Response} ->
+                                    {ok, Data} = radius_codec:encode_response(Packet, Response, Secret),
+                                    ok = gen_udp:send(Socket, SrcIP, SrcPort, Data);
+                                noreply -> ok
                             end;
-                        true -> ok
-                    end;
-                _ ->
-                    error_logger:error_msg(
-                        "Received invalid packet from NAS: ~s~n", [inet_parse:ntoa(SrcIP)])
+                        true ->
+                            Callback:handle_error(duplicate_request, [Packet, Client])
+                    end,
+                    sweep_request(SrcIP, SrcPort, Ident, Requests);
+                {error, Reason} ->
+                    Callback:handle_error(Reason, [Bin, Client])
             end;
         undefined ->
-            error_logger:warning_msg(
-                "Request from unknown client: ~s~n", [inet_parse:ntoa(SrcIP)])
-    end.
-
-do_reply(Socket, IP, Port, Response, Request, Client) ->
-    Secret = Client#nas_spec.secret,
-    case radius_codec:encode_response(Request, Response, Secret) of
-        {ok, Data} ->
-            gen_udp:send(Socket, IP, Port, Data);
-        {error, Reason} ->
-            error_logger:error_msg("Unable to respond to client due to ~p~n", [Reason])
+            Callback:handle_error(unknown_client, [SrcIP, SrcPort, Bin])
     end.
 
 lookup_client(IP, Table) ->
