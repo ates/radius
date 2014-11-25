@@ -18,6 +18,7 @@
 
 -record(state, {
     socket :: inet:socket(),
+    requests :: ets:tid(), %% table used to store requests from clients
     clients :: [#nas_spec{}],
     callback :: module()
 }).
@@ -29,8 +30,9 @@ init([IP, Port, Callback] = Options) ->
     process_flag(trap_exit, true),
     case gen_udp:open(Port, [binary, {ip, IP}]) of
         {ok, Socket} ->
+            Requests = ets:new(requests, [public]), %% made it public to allow access from spawned processes(callback)
             Clients = ets:new(clients, [{keypos, 3}]),
-            {ok, #state{socket = Socket, clients = Clients, callback = Callback}};
+            {ok, #state{socket = Socket, requests = Requests, clients = Clients, callback = Callback}};
         {error, Reason} ->
             error_logger:error_msg(
                 "** RADIUS service can't start~n"
@@ -64,7 +66,7 @@ handle_info({udp, Socket, SrcIP, SrcPort, Bin}, State) ->
 
 handle_info({'EXIT', _Pid, normal}, State) -> {noreply, State};
 handle_info({'EXIT', Pid, _Reason}, State) ->
-    sweep_request(Pid),
+    sweep_request(Pid, State#state.requests),
     {noreply, State}.
 
 code_change(_OldVsn, State, _Extra) -> {ok, State}.
@@ -72,32 +74,30 @@ code_change(_OldVsn, State, _Extra) -> {ok, State}.
 terminate(_Reason, State) ->
     gen_udp:close(State#state.socket).
 
-%%
 %% Internal functions
-%%
 do_callback([SrcIP, SrcPort, Socket, Bin, State]) ->
     case lookup_client(SrcIP, State#state.clients) of
         {ok, #nas_spec{secret = Secret} = Client} ->
             case radius_codec:decode_packet(Bin, Secret) of
-                {ok, Packet} ->
-                    case request_exists(SrcIP, SrcPort, Packet) of
+                {ok, #radius_packet{ident = Ident} = Packet} ->
+                    case ets:member(State#state.requests, {SrcIP, SrcPort, Ident}) of
                         false ->
-                            store_request(SrcIP, SrcPort, Packet, self()),
+                            true = ets:insert(State#state.requests, {{SrcIP, SrcPort, Ident}, self()}),
                             case radius_codec:identify_packet(Packet#radius_packet.code) of
                                 {ok, Type} ->
                                     Callback = State#state.callback,
                                     case Callback:handle_request(Type, Packet, Client) of
                                         {ok, Response} ->
                                             do_reply(Socket, SrcIP, SrcPort, Response, Packet, Client),
-                                            sweep_request(SrcIP, SrcPort, Packet);
+                                            sweep_request(SrcIP, SrcPort, Ident, State#state.requests);
                                         noreply ->
-                                            sweep_request(SrcIP, SrcPort, Packet);
+                                            sweep_request(SrcIP, SrcPort, Ident, State#state.requests);
                                         Unknown ->
                                             error_logger:error_msg("Bad return from handler: ~p~n", [Unknown])
                                     end;
                                 {unknown, Unknown} ->
                                     error_logger:warning_msg("Unknown request type: ~p~n", [Unknown]),
-                                    sweep_request(SrcIP, SrcPort, Packet)
+                                    sweep_request(SrcIP, SrcPort, Ident, State#state.requests)
                             end;
                         true -> ok
                     end;
@@ -127,21 +127,12 @@ lookup_client(IP, Table) ->
             {ok, Client}
     end.
 
-request_exists(IP, Port, Packet) ->
-    Ident = Packet#radius_packet.ident,
-    ets:member(?MODULE, {IP, Port, Ident}).
-
-store_request(IP, Port, Packet, Pid) ->
-    Ident = Packet#radius_packet.ident,
-    ets:insert(?MODULE, {{IP, Port, Ident}, Pid}).
-
-sweep_request(Pid) ->
-    case ets:match_object(?MODULE, {'_', Pid}) of
+sweep_request(Pid, Table) ->
+    case ets:match_object(Table, {'_', Pid}) of
         [{{IP, Port, Ident}, Pid}] ->
-            ets:delete(?MODULE, {IP, Port, Ident});
+            ets:delete(Table, {IP, Port, Ident});
         [] -> ok
     end.
 
-sweep_request(IP, Port, Packet) ->
-    Ident = Packet#radius_packet.ident,
-    ets:delete(?MODULE, {IP, Port, Ident}).
+sweep_request(IP, Port, Ident, Table) ->
+    ets:delete(Table, {IP, Port, Ident}).

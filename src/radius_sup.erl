@@ -9,9 +9,8 @@
 -export([init/1]).
 
 -define(TABLES, [
-        {radius_service, []}, % stores requests/answers records
-        {radius_dict_attrs, [{keypos, 2}, {read_concurrency, true}]},
-        {radius_dict_values, [{read_concurrency, true}]}
+    {radius_dict_attrs, [{keypos, 2}, {read_concurrency, true}]},
+    {radius_dict_values, [{read_concurrency, true}]}
 ]).
 -define(SERVICE, radius_service).
 
