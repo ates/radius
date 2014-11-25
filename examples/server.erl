@@ -2,7 +2,9 @@
 
 -behaviour(radius_service).
 
--export([start/0, stop/0, handle_request/3]).
+-export([start/0, stop/0]).
+-export([handle_request/3]).
+-export([handle_error/2]).
 
 -include("radius.hrl").
 
@@ -29,3 +31,6 @@ handle_request(Type, Request, Client) ->
     io:format("Type: ~p~nRequest: ~p~nClient: ~p~n", [Type, Request, Client]),
     Response = #radius_packet{code = ?ACCESS_ACCEPT, attrs = []},
     {ok, Response}.
+
+handle_error(Reason, Data) ->
+    io:format("Reason: ~p, Data: ~p~n", [Reason, Data]).
