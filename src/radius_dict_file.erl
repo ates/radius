@@ -5,19 +5,10 @@
 -include("radius.hrl").
 
 load(File) ->
-    case file:open(dictionary_path(File), [read]) of
-        {ok, Fd} ->
-            lists:flatten(read_line(Fd));
-        {error, Reason} ->
-            error_logger:error_msg(
-                "** Can't load RADIUS dictionary file ~s~n"
-                "   for the reason ~p: ~s~n",
-                [File, Reason, file:format_error(Reason)])
-    end.
+    {ok, Fd} = file:open(dictionary_path(File), [read]),
+    lists:flatten(read_line(Fd)).
 
-%%
 %% Internal functions
-%%
 dictionary_path(File) ->
     PrivDir = case code:priv_dir(radius) of
         {error, bad_name} ->

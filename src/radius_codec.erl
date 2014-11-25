@@ -32,23 +32,14 @@ decode_packet(Bin, Secret) ->
                             true ->
                                 {ok, Packet};
                             false ->
-                                error_logger:error_msg(
-                                    "Invalid Message-Authenticator attribute value~n", []),
                                 {error, invalid_message_authenticator}
                         end
                 end;
             false ->
-                error_logger:error_msg(
-                    "** Malformed RADIUS packet:~n"
-                    "   packet size mismatch: ~p instead of ~p~n",
-                    [Length, byte_size(Attrs) + 20]),
                 {error, packet_size_mismatch}
         end
     catch
         _:Reason ->
-            error_logger:error_msg(
-                "** Unable to decode RADIUS packet~n"
-                "   for the reason ~p~n", [Reason]),
             {error, Reason}
     end.
 
@@ -116,9 +107,6 @@ encode_response(Request, Response, Secret) ->
                     Data = list_to_binary([Code, Ident, Length, Auth, Attrs]),
                     {ok, Data};
                  {error, Reason} ->
-                     error_logger:error_msg(
-                         "** Unable to encode RADIUS attributes: ~p~n"
-                         "   for the reason: ~p~n", [A, Reason]),
                     {error, Reason}
             end;
         _Value ->
@@ -138,10 +126,6 @@ encode_response(Request, Response, Secret) ->
                 {ok, Data}
             catch
                 _:Reason ->
-                    error_logger:error_msg(
-                        "** Unable to compute Message-Authenticator~n"
-                        "   for the reason: ~p~n"
-                        "** Attributes were: ~p~n", [Reason, A]),
                     {error, Reason}
             end
     end.
@@ -176,8 +160,6 @@ decode_attribute(<<Type:8, Length:8, Rest/binary>>) ->
         _ ->
             case radius_dict:lookup_attribute(Type) of
                 not_found ->
-                    error_logger:warning_msg(
-                        "No attribute ~p found in dictionary~n", [Type]),
                     {Value, Rest1} = decode_value(Rest, Length - 2),
                     {{Type, Value}, Rest1};
                 A ->
@@ -193,9 +175,6 @@ decode_vendor_attribute(_, <<>>, Acc) -> Acc;
 decode_vendor_attribute(VendorId, <<Id, Length:8, Value/binary>>, Acc) ->
     case radius_dict:lookup_attribute({VendorId, Id}) of
         not_found ->
-            error_logger:warning_msg(
-                "No vendor specific attribute ~p found in dictionary~n",
-                [{VendorId, Id}]),
             {V, Rest1} = decode_value(Value, Length - 2),
             decode_vendor_attribute(VendorId, Rest1, [{{VendorId, Id}, V} | Acc]);
         A ->
@@ -246,7 +225,6 @@ encode_attributes([A | Attrs], Bin) ->
 encode_attribute({Code, Value}) ->
     case radius_dict:lookup_attribute(Code) of
         not_found ->
-            error_logger:warning_msg("Unable to lookup attribute ~p in dictionary~n", [Code]),
             throw({error, not_found});
         #attribute{code = Code1, type = Type} ->
             encode_attribute(Code1, Type, Value)
@@ -275,9 +253,6 @@ encode_value(Value, integer) when is_list(Value) ->
         <<IntValue:32>>
     catch
         _:Reason ->
-            error_logger:error_msg(
-                "** Unable to encode attribute value ~p as integer~n"
-                "   for the reason: ~p~n", [Value, Reason]),
             throw({error, Reason})
     end;
 encode_value(Value, integer) when is_integer(Value) ->
@@ -289,9 +264,6 @@ encode_value(Value, ipaddr) when is_list(Value) ->
         {ok, {A, B, C, D}} ->
             <<A:8, B:8, C:8, D:8>>;
         {error, Reason} ->
-            error_logger:error_msg(
-                "** Unable to encode attribute value ~p as ipaddr~n"
-                "   for the reason: ~s~n", [Value, inet:format_error(Reason)]),
             throw({error, Reason})
     end;
 encode_value({A, B, C, D}, ipaddr) ->
@@ -301,9 +273,6 @@ encode_value(Value, ipv6addr) when is_list(Value) ->
         {ok, IP} when tuple_size(IP) == 8 ->
             encode_value(IP, ipv6addr);
         {error, Reason} ->
-            error_logger:error_msg(
-                "** Unable to encode attribute value ~p as ipv6addr~n"
-                "   for the reason: ~s~n", [Value, inet:format_error(Reason)]),
             throw({error, Reason})
     end;
 encode_value(Value, ipv6addr) when tuple_size(Value) == 8 ->
@@ -312,9 +281,7 @@ encode_value({Prefix, IP}, ipv6prefix) ->
     list_to_binary([<<0:8, Prefix:8>>, encode_value(IP, ipv6addr)]);
 encode_value(Value, byte) ->
     <<Value:8/unsigned-integer>>;
-encode_value(Value, Type) ->
-    error_logger:warning_msg(
-        "Unable to encode attribute value ~p as ~p~n", [Value, Type]),
+encode_value(_Value, _Type) ->
     throw({error, encode_value}).
 
 lookup_value(Code, Name, Attrs) ->

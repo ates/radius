@@ -28,19 +28,14 @@
 start_link(Name, IP, Port, Callback) ->
     gen_server:start_link({local, Name}, ?MODULE, [IP, Port, Callback], []).
 
-init([IP, Port, Callback] = Options) ->
+init([IP, Port, Callback]) ->
     process_flag(trap_exit, true),
-    case gen_udp:open(Port, [binary, {ip, IP}]) of
+    case gen_udp:open(Port, [binary, {ip, IP}, {reuseaddr, true}]) of
         {ok, Socket} ->
             Requests = ets:new(requests, [public]), %% made it public to allow access from spawned processes(callback)
             Clients = ets:new(clients, [{keypos, 3}]),
             {ok, #state{socket = Socket, requests = Requests, clients = Clients, callback = Callback}};
         {error, Reason} ->
-            error_logger:error_msg(
-                "** RADIUS service can't start~n"
-                "   for the reason ~p: ~s~n"
-                "** Options were ~p~n",
-                [Reason, inet:format_error(Reason), Options]),
             {error, Reason}
     end.
 
