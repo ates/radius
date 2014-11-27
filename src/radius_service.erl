@@ -19,39 +19,27 @@
 -callback handle_error(Reason :: term(), Data :: term()) -> any().
 
 -record(state, {
+    name :: atom(),
     socket :: inet:socket(),
     requests :: ets:tid(), %% table used to store requests from clients
-    clients :: [#nas_spec{}],
     callback :: module()
 }).
 
 start_link(Name, IP, Port, Callback) ->
-    gen_server:start_link({local, Name}, ?MODULE, [IP, Port, Callback], []).
+    gen_server:start_link({local, Name}, ?MODULE, [Name, IP, Port, Callback], []).
 
-init([IP, Port, Callback]) ->
+init([Name, IP, Port, Callback]) ->
     process_flag(trap_exit, true),
     case gen_udp:open(Port, [binary, {ip, IP}, {reuseaddr, true}]) of
         {ok, Socket} ->
             Requests = ets:new(requests, [public]), %% made it public to allow access from spawned processes(callback)
-            Clients = ets:new(clients, [{keypos, 3}]),
-            {ok, #state{socket = Socket, requests = Requests, clients = Clients, callback = Callback}};
+            {ok, #state{name = Name, socket = Socket, requests = Requests, callback = Callback}};
         {error, Reason} ->
             {error, Reason}
     end.
 
-handle_call({add_client, NasSpec}, _From, State) ->
-    ets:insert(State#state.clients, NasSpec),
-    {reply, ok, State};
-
-handle_call({del_client, NasName}, _From, State) ->
-    Pattern = {nas_spec, NasName, '_', '_'},
-    case ets:match_object(State#state.clients, Pattern) of
-        [NasSpec] ->
-            ets:delete_object(State#state.clients, NasSpec);
-        _ -> ok
-    end,
-    {reply, ok, State};
-
+handle_call(stop, _From, State) ->
+    {stop, normal, ok, State};
 handle_call(_Request, _From, State) -> {reply, ok, State}.
 
 handle_cast(_Msg, State) -> {noreply, State}.
@@ -68,12 +56,17 @@ handle_info({'EXIT', Pid, _Reason}, State) ->
 
 code_change(_OldVsn, State, _Extra) -> {ok, State}.
 
-terminate(_Reason, State) ->
+terminate(Reason, State) ->
+    case Reason of
+        normal ->
+            true = ets:delete(radius_clients, State#state.name);
+        _ -> ok
+    end,
     gen_udp:close(State#state.socket).
 
 %% Internal functions
 do_callback([SrcIP, SrcPort, Socket, Bin, #state{requests = Requests, callback = Callback} = State]) ->
-    case lookup_client(SrcIP, State#state.clients) of
+    case lookup_client(SrcIP, State#state.name) of
         {ok, #nas_spec{secret = Secret} = Client} ->
             case radius_codec:decode_packet(Bin, Secret) of
                 {ok, #radius_packet{ident = Ident} = Packet} ->
@@ -99,13 +92,25 @@ do_callback([SrcIP, SrcPort, Socket, Bin, #state{requests = Requests, callback =
             Callback:handle_error(unknown_client, [SrcIP, SrcPort, Bin])
     end.
 
-lookup_client(IP, Table) ->
-    case ets:lookup(Table, IP) of
+lookup_client(IP, Name) ->
+    case ets:lookup(radius_clients, Name) of
         [] ->
             undefined;
-        [Client] ->
-            {ok, Client}
+        [{Name, Clients}] ->
+            check_client_ip(Clients, IP)
     end.
+
+check_client_ip([], _IP) -> undefined;
+check_client_ip([#nas_spec{ip = {ip, IP}} = Client | _Rest], IP) ->
+    {ok, Client#nas_spec{ip = IP}};
+check_client_ip([#nas_spec{ip = {net, {Network, Mask}}} = Client | Rest], IP) ->
+    case in_range(IP, {Network, Mask}) of
+        true -> {ok, Client#nas_spec{ip = IP}};
+        false ->
+            check_client_ip(Rest, IP)
+    end;
+check_client_ip([_Client| Rest], IP) ->
+    check_client_ip(Rest, IP).
 
 sweep_request(Pid, Table) ->
     case ets:match_object(Table, {'_', Pid}) of
@@ -116,3 +121,22 @@ sweep_request(Pid, Table) ->
 
 sweep_request(IP, Port, Ident, Table) ->
     ets:delete(Table, {IP, Port, Ident}).
+
+-spec aton(inet:ip_address()) -> non_neg_integer().
+aton({A, B, C, D}) ->
+    (A bsl 24) bor (B bsl 16) bor (C bsl 8) bor D.
+
+-spec in_range(IP :: inet:ip_address(), {Network :: inet:ip_address(), Mask :: 0..32 | inet:ip_address()}) -> boolean().
+in_range(IP, {Network, Mask}) ->
+    {Network0, Mask0} = parse_address(Network, Mask),
+    (aton(IP) band Mask0) == (Network0 band Mask0).
+
+-spec parse_address(IP :: inet:ip_address(), Mask :: 0..32 | inet:ip_address()) -> {0..4294967295, 0..4294967295}.
+parse_address(IP, Mask) ->
+    NetMask = case Mask of
+        N when is_tuple(N) andalso tuple_size(N) == 4 ->
+            aton(Mask);
+        N when N >= 0 andalso N =< 32 ->
+            (16#ffffffff bsr (32 - Mask)) bsl (32 - Mask)
+    end,
+    {aton(IP), NetMask}.

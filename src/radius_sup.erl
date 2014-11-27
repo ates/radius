@@ -9,6 +9,7 @@
 -export([init/1]).
 
 -define(TABLES, [
+    {radius_clients, [{read_concurrency, true}]},
     {radius_dict_attrs, [{keypos, 2}, {read_concurrency, true}]},
     {radius_dict_values, [{read_concurrency, true}]}
 ]).
@@ -19,7 +20,7 @@ start_link() ->
 
 start_child([Name, IP, Port, Callback]) ->
     Spec = {Name, {?SERVICE, start_link, [Name, IP, Port, Callback]},
-        permanent, brutal_kill, worker, [?SERVICE]},
+        transient, brutal_kill, worker, [?SERVICE]},
     supervisor:start_child(?MODULE, Spec).
 
 init([]) ->
