@@ -8,8 +8,7 @@
 -include("radius.hrl").
 
 %% @doc Start RADIUS service with specified options.
--spec start_service(atom(), [proplists:property()]) ->
-    {ok, pid()} | {error, term()}.
+-spec start_service(atom(), [proplists:property()]) -> {ok, pid()} | {error, term()}.
 start_service(Name, Opts) when is_atom(Name), is_list(Opts) ->
     IP = proplists:get_value(ip, Opts),
     Port = proplists:get_value(port, Opts),
@@ -17,13 +16,13 @@ start_service(Name, Opts) when is_atom(Name), is_list(Opts) ->
     radius_sup:start_child([Name, IP, Port, Callback]).
 
 %% @doc Stop RADIUS service by name.
--spec stop_service(atom()) -> ok | {error, atom()}.
+-spec stop_service(atom()) -> ok | {error, term()}.
 stop_service(Name) when is_atom(Name) ->
     ok = gen_server:call(Name, stop),
     supervisor:delete_child(radius_sup, Name).
 
 %% @doc Returns the list of running RADIUS services.
--spec services() -> [] | [atom()].
+-spec services() -> [term()].
 services() ->
     [S || {S, _, _, _} <- supervisor:which_children(radius_sup)].
 
@@ -50,7 +49,7 @@ del_client(SvcName, NasName) when is_atom(SvcName) ->
     end.
 
 %% @doc Returns value of RADIUS attribute defined in packet
--spec attribute_value(non_neg_integer() | tuple() | string(),
-    #radius_packet{} | list()) -> undefined | term().
+-spec attribute_value(Code :: non_neg_integer() | tuple() | string(), Packet :: #radius_packet{} | [proplists:property()]) ->
+    undefined | term().
 attribute_value(Code, Packet) ->
     radius_codec:attribute_value(Code, Packet).

@@ -24,7 +24,7 @@ start_child([Name, IP, Port, Callback]) ->
     supervisor:start_child(?MODULE, Spec).
 
 init([]) ->
-    create_table(?TABLES),
+    ok = create_table(?TABLES),
     {ok, {{one_for_one, 5, 10}, []}}.
 
 create_table(Tables) when is_list(Tables) ->

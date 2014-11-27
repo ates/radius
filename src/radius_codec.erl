@@ -44,8 +44,8 @@ decode_packet(Bin, Secret) ->
     end.
 
 %% @doc Returns the value of specified RADIUS attribute
--spec attribute_value(Code :: non_neg_integer() | tuple(), Packet :: #radius_packet{}) ->
-    undefined | proplists:property().
+-spec attribute_value(Code :: non_neg_integer() | tuple() | string(), Packet :: #radius_packet{} | [proplists:property()]) ->
+    undefined | term().
 attribute_value(Code, Packet) when is_record(Packet, radius_packet) ->
     attribute_value(Code, Packet#radius_packet.attrs);
 attribute_value(Code, Attrs) when is_list(Attrs) ->

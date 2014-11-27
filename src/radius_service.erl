@@ -50,8 +50,12 @@ handle_info({udp, Socket, SrcIP, SrcPort, Bin}, State) ->
     {noreply, State};
 
 handle_info({'EXIT', _Pid, normal}, State) -> {noreply, State};
-handle_info({'EXIT', Pid, _Reason}, State) ->
-    sweep_request(Pid, State#state.requests),
+handle_info({'EXIT', Pid, _Reason}, #state{requests = Requests} = State) ->
+    case ets:match_object(Requests, {'_', Pid}) of
+        [{{IP, Port, Ident}, Pid}] ->
+            ets:delete(Requests, {IP, Port, Ident});
+        [] -> ok
+    end,
     {noreply, State}.
 
 code_change(_OldVsn, State, _Extra) -> {ok, State}.
@@ -84,7 +88,7 @@ do_callback([SrcIP, SrcPort, Socket, Bin, #state{requests = Requests, callback =
                         true ->
                             Callback:handle_error(duplicate_request, [Packet, Client])
                     end,
-                    sweep_request(SrcIP, SrcPort, Ident, Requests);
+                    ets:delete(Requests, {SrcIP, SrcPort, Ident});
                 {error, Reason} ->
                     Callback:handle_error(Reason, [Bin, Client])
             end;
@@ -111,16 +115,6 @@ check_client_ip([#nas_spec{ip = {net, {Network, Mask}}} = Client | Rest], IP) ->
     end;
 check_client_ip([_Client| Rest], IP) ->
     check_client_ip(Rest, IP).
-
-sweep_request(Pid, Table) ->
-    case ets:match_object(Table, {'_', Pid}) of
-        [{{IP, Port, Ident}, Pid}] ->
-            ets:delete(Table, {IP, Port, Ident});
-        [] -> ok
-    end.
-
-sweep_request(IP, Port, Ident, Table) ->
-    ets:delete(Table, {IP, Port, Ident}).
 
 -spec aton(inet:ip_address()) -> non_neg_integer().
 aton({A, B, C, D}) ->

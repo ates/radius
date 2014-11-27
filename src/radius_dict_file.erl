@@ -22,7 +22,7 @@ read_line(Fd) ->
 read_line(Fd, Acc) ->
     case io:get_line(Fd, "") of
         eof ->
-            file:close(Fd),
+            ok = file:close(Fd),
             lists:reverse(Acc);
         Line ->
             L = strip_comments(Line),
