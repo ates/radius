@@ -87,7 +87,11 @@
 
 %% NAS specification record
 %% Fields:
-%%     ip: IP address of the NAS
+%%     ip: IP address or network of the NAS
 %%     name: Identifies of NAS
 %%     secret: Shared secret required for NAS authorization
--record(nas_spec, {name, ip, secret}).
+-record(nas_spec, {
+    name :: term(),
+    ip :: {ip, inet:ip_address()} | {net, {inet:ip_address(), Mask :: 0..32 | inet:ip_address()}},
+    secret :: string()
+}).
