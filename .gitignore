@@ -3,5 +3,4 @@ ebin
 erl_crash.dump
 .eunit
 *.swp
-*.profile
-radius.plt
+.radius.plt
