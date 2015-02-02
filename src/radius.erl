@@ -2,18 +2,21 @@
 
 %% API
 -export([start_service/2, stop_service/1, services/0]).
+-export([start_service/3]).
 -export([add_client/2, del_client/2]).
 -export([attribute_value/2]).
 
 -include("radius.hrl").
 
 %% @doc Start RADIUS service with specified options.
--spec start_service(atom(), [proplists:property()]) -> {ok, pid()} | {error, term()}.
-start_service(Name, Opts) when is_atom(Name), is_list(Opts) ->
+start_service(Name, Opts) ->
+    start_service(Name, Opts, []).
+
+start_service(Name, Opts, SocketOpts) ->
     IP = proplists:get_value(ip, Opts),
     Port = proplists:get_value(port, Opts),
     Callback = proplists:get_value(callback, Opts),
-    radius_sup:start_child([Name, IP, Port, Callback]).
+    radius_sup:start_child([Name, IP, Port, Callback, SocketOpts]).
 
 %% @doc Stop RADIUS service by name.
 -spec stop_service(atom()) -> ok | {error, term()}.

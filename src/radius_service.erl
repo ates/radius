@@ -3,7 +3,7 @@
 -behaviour(gen_server).
 
 %% API
--export([start_link/4]).
+-export([start_link/5]).
 
 %% gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2,
@@ -25,12 +25,12 @@
     callback :: module()
 }).
 
-start_link(Name, IP, Port, Callback) ->
-    gen_server:start_link({local, Name}, ?MODULE, [Name, IP, Port, Callback], []).
+start_link(Name, IP, Port, Callback, SocketOpts) ->
+    gen_server:start_link({local, Name}, ?MODULE, [Name, IP, Port, Callback, SocketOpts], []).
 
-init([Name, IP, Port, Callback]) ->
+init([Name, IP, Port, Callback, SocketOpts]) ->
     process_flag(trap_exit, true),
-    case gen_udp:open(Port, [binary, {ip, IP}, {reuseaddr, true}]) of
+    case gen_udp:open(Port, [binary, {ip, IP}, {reuseaddr, true} | SocketOpts]) of
         {ok, Socket} ->
             Requests = ets:new(requests, [public]), %% made it public to allow access from spawned processes(callback)
             {ok, #state{name = Name, socket = Socket, requests = Requests, callback = Callback}};

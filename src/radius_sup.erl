@@ -18,8 +18,8 @@
 start_link() ->
     supervisor:start_link({local, ?MODULE}, ?MODULE, []).
 
-start_child([Name, IP, Port, Callback]) ->
-    Spec = {Name, {?SERVICE, start_link, [Name, IP, Port, Callback]},
+start_child([Name, IP, Port, Callback, SocketOpts]) ->
+    Spec = {Name, {?SERVICE, start_link, [Name, IP, Port, Callback, SocketOpts]},
         transient, brutal_kill, worker, [?SERVICE]},
     supervisor:start_child(?MODULE, Spec).
 
