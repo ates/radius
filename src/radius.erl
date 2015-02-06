@@ -5,6 +5,7 @@
 -export([start_service/3]).
 -export([add_client/2, del_client/2]).
 -export([attribute_value/2]).
+-export([stats/1]).
 
 -include("radius.hrl").
 
@@ -56,3 +57,6 @@ del_client(SvcName, NasName) when is_atom(SvcName) ->
     undefined | term().
 attribute_value(Code, Packet) ->
     radius_codec:attribute_value(Code, Packet).
+
+stats(Name) ->
+    gen_server:call(Name, stats).

@@ -38,6 +38,9 @@ init([Name, IP, Port, Callback, SocketOpts]) ->
             {error, Reason}
     end.
 
+handle_call(stats, _From, State) ->
+    {reply, inet:getstat(State#state.socket), State};
+
 handle_call(stop, _From, State) ->
     {stop, normal, ok, State};
 handle_call(_Request, _From, State) -> {reply, ok, State}.
