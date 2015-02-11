@@ -4,6 +4,7 @@
 
 %% API
 -export([start_link/3]).
+-export([start_link/4]).
 -export([send/3]).
 -export([stop/1]).
 
@@ -18,11 +19,16 @@
     host :: inet:ip_address(),
     port :: inet:port_number(),
     secret :: string(),
-    ident = 1 :: pos_integer()
+    ident = 0 :: 0..255,
+    recv_timeout :: pos_integer(),
+    wait_for_reply = true :: boolean()
 }).
 
 start_link(Host, Port, Secret) ->
-    gen_server:start_link(?MODULE, [Host, Port, Secret], []).
+    gen_server:start_link(?MODULE, [Host, Port, Secret, []], []).
+
+start_link(Host, Port, Secret, Options) ->
+    gen_server:start_link(?MODULE, [Host, Port, Secret, Options], []).
 
 send(Pid, Type, Attrs) ->
     gen_server:call(Pid, {send, Type, Attrs}).
@@ -30,13 +36,20 @@ send(Pid, Type, Attrs) ->
 stop(Pid) ->
     gen_server:call(Pid, stop).
 
-init([Host, Port, Secret]) ->
+init([Host, Port, Secret, Options]) ->
     {ok, Socket} = gen_udp:open(0, [{active, false}, inet, binary]),
+    WaitForReply = case lists:member(noreply, Options) of
+        true ->
+            false;
+        false -> true
+    end,
     State = #state{
         socket = Socket,
         host = Host,
         port = Port,
-        secret = Secret
+        secret = Secret,
+        recv_timeout = proplists:get_value(timeout, Options, 5000),
+        wait_for_reply = WaitForReply
     },
     {ok, State}.
 
@@ -48,10 +61,14 @@ handle_call({send, Type, Attrs}, _From, #state{host = Host, port = Port, ident =
     },
     Req = radius_codec:encode_request(Packet, State#state.secret),
     ok = gen_udp:send(State#state.socket, Host, Port, Req),
-    Reply = case gen_udp:recv(State#state.socket, 0, 5000) of
-        {ok, {_Address, _Port, Response}} ->
-            radius_codec:decode_packet(Response, State#state.secret);
-        Error -> Error
+    Reply = case State#state.wait_for_reply of
+        true ->
+            case gen_udp:recv(State#state.socket, 0, State#state.recv_timeout) of
+                {ok, {_Address, _Port, Response}} ->
+                    radius_codec:decode_packet(Response, State#state.secret);
+                Error -> Error
+        end;
+        false -> ok
     end,
     {reply, Reply, State#state{ident = Ident + 1}};
 
