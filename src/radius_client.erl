@@ -70,7 +70,12 @@ handle_call({send, Type, Attrs}, _From, #state{host = Host, port = Port, ident =
         end;
         false -> ok
     end,
-    {reply, Reply, State#state{ident = Ident + 1}};
+    NewIdent =
+        if Ident == 255 ->
+            1;
+        true -> Ident + 1
+    end,
+    {reply, Reply, State#state{ident = NewIdent}};
 
 handle_call(stop, _From, State) ->
     {stop, normal, ok, State};
