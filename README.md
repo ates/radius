@@ -1,8 +1,8 @@
 RADIUS protocol
 ===============
 
-Example:
---------
+Server example
+--------------
 
 ```erlang
 -module(server).
@@ -19,16 +19,14 @@ Example:
 start() ->
     {ok, _Started} = application:ensure_all_started(radius),
     lists:foreach(fun radius_dict:add/1, radius_dict_file:load("dictionary")),
-    Nas1 = #nas_spec{name = nas1, ip = {ip, {127,0,0,1}}, secret = "testing123"},
-    Nas2 = #nas_spec{name = nas2, ip = {net, {{10,10,0,0}, 24}}, secret = "testing123"},
+    Nas = #nas_spec{name = nas1, ip = {ip, {127,0,0,1}}, secret = "testing123"},
     ServiceOpts = [
         {ip, {0,0,0,0}},
         {port, 1812},
         {callback, ?MODULE}
     ],
     radius:start_service(?SERVICE_NAME, ServiceOpts),
-    radius:add_client(?SERVICE_NAME, Nas1),
-    radius:add_client(?SERVICE_NAME, Nas2).
+    radius:add_client(?SERVICE_NAME, Nas).
 
 stop() ->
     radius:stop_service(?SERVICE_NAME).
@@ -42,14 +40,35 @@ handle_error(Reason, Data) ->
     io:format("Reason: ~p, Data: ~p~n", [Reason, Data]).
 ```
 
-Supported data types:
----------------------
+Client example
+--------------
 
- * string - 0-253 octets
- * ipaddr - 4 octets in network byte order
- * integer - 32 bit value in big endian order (high byte first)
- * date - 32 bit value in big endian order - seconds since 00:00:00 GMT,  Jan.  1,  1970
- * ipv6addr - 16 octets in network byte order
- * ipv6prefix - 18 octets in network byte order
- * byte - 8 bit unsigned integer
- * octets - raw octets, printed and input as hex strings
+```erlang
+-module(client).
+
+-export([send/0]).
+
+-include("radius.hrl").
+
+send() ->
+    {ok, _Started} = application:ensure_all_started(radius),
+    lists:foreach(fun radius_dict:add/1, radius_dict_file:load("dictionary")),
+
+    {ok, Pid} = radius_client:start_link({127, 0, 0, 1}, 1812, "testing123"),
+
+    Attrs = [
+        {"User-Name", "john"},
+        {"Password", "secret"}
+    ],
+
+    Reply = radius_client:send(Pid, ?ACCESS_REQUEST, Attrs),
+
+    io:format("Reply: ~p~n", [Reply]),
+
+    radius_client:stop(Pid).
+```
+
+License
+-------
+
+All parts of this software are distributed under the Apache License, Version 2.0 terms.
