@@ -1,6 +1,8 @@
 RADIUS protocol
 ===============
 
+[![Build Status](https://secure.travis-ci.org/ates/radius.png)](https://travis-ci.org/ates/radius)
+
 Server example
 --------------
 
