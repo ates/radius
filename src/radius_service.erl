@@ -32,7 +32,9 @@ init([Name, IP, Port, Callback, SocketOpts]) ->
     process_flag(trap_exit, true),
     case gen_udp:open(Port, [binary, {ip, IP}, {reuseaddr, true} | SocketOpts]) of
         {ok, Socket} ->
-            Requests = ets:new(requests, [public]), %% made it public to allow access from spawned processes(callback)
+            %% creates the table to store requests from clients
+            %% made it public to allow access from spawned processes(callback)
+            Requests = ets:new(radius_requests, [public]),
             {ok, #state{name = Name, socket = Socket, requests = Requests, callback = Callback}};
         {error, Reason} ->
             {error, Reason}
