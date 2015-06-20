@@ -4,6 +4,9 @@
 
 %% API
 -export([start_link/5]).
+-export([name/1]).
+-export([stop/1]).
+-export([stats/1]).
 
 %% gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2,
@@ -26,7 +29,11 @@
 }).
 
 start_link(Name, IP, Port, Callback, SocketOpts) ->
-    gen_server:start_link({local, Name}, ?MODULE, [Name, IP, Port, Callback, SocketOpts], []).
+    gen_server:start_link(?MODULE, [Name, IP, Port, Callback, SocketOpts], []).
+
+name(Pid) -> gen_server:call(Pid, name).
+stop(Pid) -> gen_server:call(Pid, stop).
+stats(Pid) -> gen_server:call(Pid, stats).
 
 init([Name, IP, Port, Callback, SocketOpts]) ->
     process_flag(trap_exit, true),
@@ -42,6 +49,8 @@ init([Name, IP, Port, Callback, SocketOpts]) ->
 
 handle_call(stats, _From, State) ->
     {reply, inet:getstat(State#state.socket), State};
+handle_call(name, _From, State) ->
+    {reply, State#state.name, State};
 
 handle_call(stop, _From, State) ->
     {stop, normal, ok, State};

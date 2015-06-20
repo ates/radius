@@ -22,13 +22,17 @@ start_service(Name, Opts, SocketOpts) ->
 %% @doc Stop RADIUS service by name.
 -spec stop_service(atom()) -> ok | {error, term()}.
 stop_service(Name) when is_atom(Name) ->
-    ok = gen_server:call(Name, stop),
-    supervisor:delete_child(radius_sup, Name).
+    F = fun(Id, Pid) ->
+        radius_service:stop(Pid),
+        supervisor:delete_child(radius_sup, Id)
+    end,
+    [F(Id, Pid) || {Id, Pid, _, _} <- supervisor:which_children(radius_sup), radius_service:name(Pid) == Name],
+    ok.
 
 %% @doc Returns the list of running RADIUS services.
 -spec services() -> [term()].
 services() ->
-    [S || {S, _, _, _} <- supervisor:which_children(radius_sup)].
+    lists:usort([radius_service:name(element(2, S)) || S <- supervisor:which_children(radius_sup)]).
 
 %% @doc Add new NAS to the list of allowed NASes for specific service
 -spec add_client(atom(), #nas_spec{}) -> ok.
@@ -59,4 +63,9 @@ attribute_value(Code, Packet) ->
     radius_codec:attribute_value(Code, Packet).
 
 stats(Name) ->
-    gen_server:call(Name, stats).
+    [
+        begin
+            {ok, Values} = radius_service:stats(Pid),
+            {Id, Values}
+        end || {Id, Pid, _, _} <- supervisor:which_children(radius_sup), radius_service:name(Pid) == Name
+    ].
