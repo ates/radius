@@ -3,10 +3,6 @@
 -define(ACCOUNTING_REQUEST_PORT, 1813).
 -define(POD_COA_REQUEST_PORT, 3799).
 
-%% The maximum length of the RADIUS packet in bytes
-%% according to the RFC 2865 document
--define(MAX_PACKET_LENGTH, 4096).
-
 %% RADIUS Packet format
 %% 0                   1                   2                   3
 %% 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1

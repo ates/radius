@@ -4,6 +4,8 @@
 -export([encode_response/3, encode_attributes/1]).
 -export([encode_request/2]).
 
+-compile(export_all).
+
 -include("radius.hrl").
 
 %% @doc Decode binary RADIUS packet.
@@ -142,11 +144,9 @@ encode_attributes(Attrs) ->
             {error, Reason}
     end.
 
-%%
 %% Internal functions
-%%
 decode_attributes(<<>>, Attrs) ->
-    lists:reverse(lists:flatten(Attrs));
+    lists:reverse(Attrs);
 decode_attributes(Bin, Attrs) ->
     {Attr, Rest} = decode_attribute(Bin),
     decode_attributes(Rest, [Attr | Attrs]).
@@ -215,12 +215,11 @@ decode_value(Bin, Length) ->
     <<Value:Length/binary, Rest/binary>> = Bin,
     {Value, Rest}.
 
-encode_attributes(undefined, []) ->
-    <<>>;
+encode_attributes([A | Attrs], Bin) ->
+    encode_attributes(Attrs, [encode_attribute(A) | Bin]);
 encode_attributes([], Bin) ->
     list_to_binary(lists:reverse(Bin));
-encode_attributes([A | Attrs], Bin) ->
-    encode_attributes(Attrs, [encode_attribute(A) | Bin]).
+encode_attributes(undefined, []) -> <<>>.
 
 encode_attribute({Code, Value}) ->
     case radius_dict:lookup_attribute(Code) of
@@ -276,9 +275,9 @@ encode_value(Value, ipv6addr) when is_list(Value) ->
             throw({error, Reason})
     end;
 encode_value(Value, ipv6addr) when tuple_size(Value) == 8 ->
-    binary:list_to_bin([<<I:16>> || I <- tuple_to_list(Value)]);
+    << <<I:16>> || I <- tuple_to_list(Value) >>;
 encode_value({Prefix, IP}, ipv6prefix) ->
-    list_to_binary([<<0:8, Prefix:8>>, encode_value(IP, ipv6addr)]);
+    <<0:8, Prefix:8, (encode_value(IP, ipv6addr))/binary>>;
 encode_value(Value, byte) ->
     <<Value:8/unsigned-integer>>;
 encode_value(_Value, _Type) ->
