@@ -9,7 +9,7 @@ REUSE_PORT
 To make radius service utilize the REUSE_PORT feature just add the following to the sockets options:
 
 ```erlang
-{reuseport, {true, N}}
+{reuseport, N}
 ```
 
 Where N is amount of workers which must be listen the port

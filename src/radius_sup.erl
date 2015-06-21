@@ -23,7 +23,7 @@ start_link() ->
 
 start_child([Name, IP, Port, Callback, SocketOpts]) ->
     case proplists:get_value(reuseport, SocketOpts) of
-        {true, N} ->
+        N when N > 1 ->
             NewSocketOpts = reuseport(SocketOpts),
             F = fun(Idx) ->
                 Id = list_to_atom(atom_to_list(Name) ++ integer_to_list(Idx)),
