@@ -1,6 +1,9 @@
 {application, radius, [
     {description, "RADIUS"},
-    {vsn, "0.0.12"},
+    {vsn, "0.0.13"},
     {applications, [kernel, stdlib]},
-    {mod, {radius_app, []}}
+    {mod, {radius_app, []}},
+    {maintainers, ["Artem Teslenko"]},
+    {licenses, ["Apache"]},
+    {links, [{"Github", "https://github.com/ates/radius"}]}
 ]}.
