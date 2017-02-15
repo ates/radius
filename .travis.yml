@@ -1,6 +1,7 @@
 language: erlang
-script: "make && make tests"
+script: "rebar3 ct"
 otp_release:
     - R16B03-1
-    - 17.1
-    - 17.0
+    - 17.5
+    - 18.3
+    - 19.2
