@@ -33,6 +33,8 @@ $INCLUDE dictionary.cisco
 $INCLUDE dictionary.3gpp
 $INCLUDE dictionary.nokia
 $INCLUDE dictionary.airespace
+$INCLUDE dictionary.sip
+$INCLUDE dictionary.openser
 #
 #	Following are the proper new names. Use these.
 #
